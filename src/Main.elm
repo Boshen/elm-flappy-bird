@@ -157,7 +157,11 @@ update msg game =
         cmd =
             case msg of
                 Interval ->
-                    Random.generate CreatePillar (Random.float 200 300)
+                    let
+                        h =
+                            game.height / 5
+                    in
+                    Random.generate CreatePillar (Random.float h (game.height - h))
 
                 _ ->
                     Cmd.none
