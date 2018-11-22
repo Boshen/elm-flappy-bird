@@ -3,8 +3,8 @@ module Main exposing (main)
 import Browser
 import Browser.Dom exposing (..)
 import Browser.Events exposing (..)
-import Html exposing (Html, div)
-import Html.Attributes exposing (src)
+import Html exposing (Html, div, text)
+import Html.Attributes exposing (src, style)
 import Json.Decode as Decode
 import Random
 import String exposing (fromFloat)
@@ -66,7 +66,7 @@ defaultGame : Flags -> Game
 defaultGame flags =
     { vy = 0
     , bird =
-        { x = 0
+        { x = -1000
         , y = 100
         , w = 500 / 5
         , h = 350 / 5
@@ -106,8 +106,6 @@ update msg game =
                         { game
                             | width = viewport.width
                             , height = viewport.height
-                            , pillars = [ createPillar 0 game ]
-                            , bird = { bird | x = width / 2 }
                         }
 
                     _ ->
@@ -126,17 +124,15 @@ update msg game =
                         }
 
                     Tick dt ->
-                        { game
-                            | bird = moveBird dt game game.bird
-                            , vy = game.vy - constants.gravity * dt
-                            , pillars = game.pillars |> List.map (movePillar dt) |> List.filter keepPillar
-                            , state =
-                                if hasBirdCollided game then
-                                    Stop
+                        if hasBirdCollided game then
+                            { game | state = Stop }
 
-                                else
-                                    Play
-                        }
+                        else
+                            { game
+                                | bird = moveBird dt game game.bird
+                                , vy = game.vy - constants.gravity * dt
+                                , pillars = game.pillars |> List.map (movePillar dt) |> List.filter keepPillar
+                            }
 
                     CreatePillar n ->
                         { game
@@ -146,7 +142,15 @@ update msg game =
 
                     Space ->
                         if game.state == Stop then
-                            { game | state = Play }
+                            let
+                                bird =
+                                    game.bird
+                            in
+                            { game
+                                | state = Play
+                                , pillars = [ createPillar 0 game ]
+                                , bird = { bird | x = game.width / 2 }
+                            }
 
                         else
                             { game | vy = constants.jumpSpeed }
@@ -215,21 +219,31 @@ createPillar h { toggle, width, height } =
 
 view : Game -> Html Msg
 view game =
-    svg
-        [ width "100%"
-        , height "100%"
-        , viewBox (String.join " " [ "0", "0", fromFloat game.width, fromFloat game.height ])
-        ]
-        [ g [] (List.map renderPillar game.pillars)
-        , image
-            [ game.bird.x |> fromFloat |> x
-            , game.bird.y |> fromFloat |> y
-            , game.bird.w |> fromFloat |> width
-            , game.bird.h |> fromFloat |> height
-            , xlinkHref game.flags.birdSrc
+    if game.state == Stop then
+        div
+            [ Html.Attributes.style "display" "flex"
+            , Html.Attributes.style "align-items" "center"
+            , Html.Attributes.style "justify-content" "center"
+            , Html.Attributes.style "height" "100vh"
             ]
-            []
-        ]
+            [ Html.text "Press Space to Start" ]
+
+    else
+        svg
+            [ width "100%"
+            , height "100%"
+            , viewBox (String.join " " [ "0", "0", fromFloat game.width, fromFloat game.height ])
+            ]
+            [ g [] (List.map renderPillar game.pillars)
+            , image
+                [ game.bird.x |> fromFloat |> x
+                , game.bird.y |> fromFloat |> y
+                , game.bird.w |> fromFloat |> width
+                , game.bird.h |> fromFloat |> height
+                , xlinkHref game.flags.birdSrc
+                ]
+                []
+            ]
 
 
 renderPillar : Pos -> Svg Msg
