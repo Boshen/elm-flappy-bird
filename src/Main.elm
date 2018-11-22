@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Browser
+import Browser.Dom exposing (..)
 import Browser.Events exposing (..)
 import Html exposing (Html, div)
 import Html.Attributes exposing (src)
@@ -9,6 +10,7 @@ import Random
 import String exposing (fromFloat)
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
+import Task
 import Time
 
 
@@ -19,6 +21,8 @@ type alias Game =
     , flags : Flags
     , state : State
     , toggle : Bool
+    , width : Float
+    , height : Float
     }
 
 
@@ -47,13 +51,12 @@ type Msg
     | Pause
     | CreatePillar Float
     | Interval
+    | GotViewport Viewport
 
 
 constants =
     { jumpSpeed = 100.0
     , gravity = 300.0
-    , width = 800.0
-    , height = 600.0
     , pillarVelocity = 150
     , pillarTime = 2000
     }
@@ -63,23 +66,24 @@ defaultGame : Flags -> Game
 defaultGame flags =
     { vy = 0
     , bird =
-        { x = constants.width / 2
-        , y = 0
+        { x = 0
+        , y = 100
         , w = 500 / 5
         , h = 350 / 5
         }
     , pillars =
-        [ createPillar 200 True
-        ]
+        []
     , flags = flags
     , state = Stop
     , toggle = True
+    , width = 800.0
+    , height = 600.0
     }
 
 
 init : Flags -> ( Game, Cmd Msg )
 init flags =
-    ( defaultGame flags, Cmd.none )
+    ( defaultGame flags, Task.perform GotViewport getViewport )
 
 
 update : Msg -> Game -> ( Game, Cmd Msg )
@@ -87,7 +91,27 @@ update msg game =
     let
         m =
             if game.state == Stop && msg /= Space then
-                game
+                case msg of
+                    GotViewport { viewport } ->
+                        let
+                            width =
+                                viewport.width
+
+                            height =
+                                viewport.height
+
+                            bird =
+                                game.bird
+                        in
+                        { game
+                            | width = viewport.width
+                            , height = viewport.height
+                            , pillars = [ createPillar 0 game ]
+                            , bird = { bird | x = width / 2 }
+                        }
+
+                    _ ->
+                        game
 
             else
                 case msg of
@@ -116,7 +140,7 @@ update msg game =
 
                     CreatePillar n ->
                         { game
-                            | pillars = createPillar n game.toggle :: game.pillars
+                            | pillars = createPillar n game :: game.pillars
                             , toggle = not game.toggle
                         }
 
@@ -149,7 +173,7 @@ moveBird dt game bird =
 hasBirdCollided : Game -> Bool
 hasBirdCollided game =
     (game.bird.y < 0)
-        || (game.bird.y + game.bird.h > constants.height)
+        || (game.bird.y + game.bird.h > game.height)
         || List.any (hasCollided game.bird) game.pillars
 
 
@@ -171,15 +195,15 @@ keepPillar { x } =
     x >= 0
 
 
-createPillar : Float -> Bool -> Pos
-createPillar h toggle =
-    { x = constants.width
+createPillar : Float -> Game -> Pos
+createPillar h { toggle, width, height } =
+    { x = width
     , y =
         if toggle then
             0
 
         else
-            constants.height - h
+            height - h
     , w = 10
     , h = h
     }
@@ -190,8 +214,7 @@ view game =
     svg
         [ width "100%"
         , height "100%"
-        , viewBox (String.join " " [ "0", "0", fromFloat constants.width, fromFloat constants.height ])
-        , Svg.Attributes.style "border: 1px solid"
+        , viewBox (String.join " " [ "0", "0", fromFloat game.width, fromFloat game.height ])
         ]
         [ g [] (List.map renderPillar game.pillars)
         , image
