@@ -50,7 +50,6 @@ type Msg
     = NoOp
     | Tick Float
     | Space
-    | Pause
     | CreatePillar Float
     | Interval
     | GotViewport Viewport
@@ -64,15 +63,19 @@ constants =
     }
 
 
+defaultBird : Pos
+defaultBird =
+    { x = -1000
+    , y = 100
+    , w = 500 / 5
+    , h = 350 / 5
+    }
+
+
 defaultGame : Flags -> Game
 defaultGame flags =
     { vy = 0
-    , bird =
-        { x = -1000
-        , y = 100
-        , w = 500 / 5
-        , h = 350 / 5
-        }
+    , bird = defaultBird
     , pillars =
         []
     , flags = flags
@@ -96,19 +99,10 @@ update msg game =
             if game.state == Stop && msg /= Space then
                 case msg of
                     GotViewport { viewport } ->
-                        let
-                            width =
-                                viewport.width
-
-                            height =
-                                viewport.height
-
-                            bird =
-                                game.bird
-                        in
                         { game
                             | width = viewport.width
                             , height = viewport.height
+                            , bird = { defaultBird | x = viewport.width / 2 }
                         }
 
                     _ ->
@@ -116,16 +110,6 @@ update msg game =
 
             else
                 case msg of
-                    Pause ->
-                        { game
-                            | state =
-                                if game.state == Play then
-                                    Stop
-
-                                else
-                                    Play
-                        }
-
                     Tick dt ->
                         if hasBirdCollided game then
                             { game | state = Stop }
@@ -151,14 +135,11 @@ update msg game =
 
                     Space ->
                         if game.state == Stop then
-                            let
-                                bird =
-                                    game.bird
-                            in
                             { game
                                 | state = Play
                                 , pillars = [ createPillar 0 game ]
-                                , bird = { bird | x = game.width / 2 }
+                                , bird = { defaultBird | x = game.width / 2 }
+                                , vy = constants.jumpSpeed
                             }
 
                         else
@@ -284,9 +265,6 @@ mapKey string =
     case string of
         " " ->
             Space
-
-        "p" ->
-            Pause
 
         _ ->
             NoOp
