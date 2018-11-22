@@ -3,7 +3,7 @@ module Main exposing (main)
 import Browser
 import Browser.Dom exposing (..)
 import Browser.Events exposing (..)
-import Html exposing (Html, div, text)
+import Html exposing (Html, div)
 import Html.Attributes exposing (src, style)
 import Json.Decode as Decode
 import Random
@@ -23,6 +23,7 @@ type alias Game =
     , toggle : Bool
     , width : Float
     , height : Float
+    , backgroundX : Float
     }
 
 
@@ -33,6 +34,7 @@ type State
 
 type alias Flags =
     { birdSrc : String
+    , backgroundSrc : String
     }
 
 
@@ -55,10 +57,10 @@ type Msg
 
 
 constants =
-    { jumpSpeed = 100.0
+    { jumpSpeed = 150.0
     , gravity = 300.0
     , pillarVelocity = 150
-    , pillarTime = 2000
+    , pillarTime = 3000
     }
 
 
@@ -78,6 +80,7 @@ defaultGame flags =
     , toggle = True
     , width = 800.0
     , height = 600.0
+    , backgroundX = 0
     }
 
 
@@ -132,6 +135,12 @@ update msg game =
                                 | bird = moveBird dt game game.bird
                                 , vy = game.vy - constants.gravity * dt
                                 , pillars = game.pillars |> List.map (movePillar dt) |> List.filter keepPillar
+                                , backgroundX =
+                                    if game.backgroundX < 0 then
+                                        game.width
+
+                                    else
+                                        game.backgroundX - 50 * dt
                             }
 
                     CreatePillar n ->
@@ -219,31 +228,44 @@ createPillar h { toggle, width, height } =
 
 view : Game -> Html Msg
 view game =
-    if game.state == Stop then
-        div
-            [ Html.Attributes.style "display" "flex"
-            , Html.Attributes.style "align-items" "center"
-            , Html.Attributes.style "justify-content" "center"
-            , Html.Attributes.style "height" "100vh"
-            ]
-            [ Html.text "Press Space to Start" ]
-
-    else
-        svg
+    svg
+        [ width "100%"
+        , height "100%"
+        , viewBox (String.join " " [ "0", "0", fromFloat game.width, fromFloat game.height ])
+        ]
+        [ image
             [ width "100%"
             , height "100%"
-            , viewBox (String.join " " [ "0", "0", fromFloat game.width, fromFloat game.height ])
+            , preserveAspectRatio "none"
+            , game.backgroundX |> fromFloat |> x
+            , xlinkHref game.flags.backgroundSrc
             ]
-            [ g [] (List.map renderPillar game.pillars)
-            , image
-                [ game.bird.x |> fromFloat |> x
-                , game.bird.y |> fromFloat |> y
-                , game.bird.w |> fromFloat |> width
-                , game.bird.h |> fromFloat |> height
-                , xlinkHref game.flags.birdSrc
-                ]
+            []
+        , image
+            [ width "100%"
+            , height "100%"
+            , preserveAspectRatio "none"
+            , game.backgroundX - game.width |> fromFloat |> x
+            , xlinkHref game.flags.backgroundSrc
+            ]
+            []
+        , g [] (List.map renderPillar game.pillars)
+        , image
+            [ game.bird.x |> fromFloat |> x
+            , game.bird.y |> fromFloat |> y
+            , game.bird.w |> fromFloat |> width
+            , game.bird.h |> fromFloat |> height
+            , xlinkHref game.flags.birdSrc
+            ]
+            []
+        , text_ [ game.width / 2 |> fromFloat |> x, game.height / 2 |> fromFloat |> y ]
+            (if game.state == Stop then
+                [ text "Press Space to Start" ]
+
+             else
                 []
-            ]
+            )
+        ]
 
 
 renderPillar : Pos -> Svg Msg
